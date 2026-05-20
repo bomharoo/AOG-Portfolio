@@ -1,0 +1,8 @@
+@import "tailwindcss";
+
+@theme {
+  --color-aog-yellow: #f9cf2c;
+  --color-aog-darkBg: #090a0f;
+  --color-aog-darkCard: #14161f;
+  --color-aog-grayMuted: #868c99;
+}
