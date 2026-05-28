@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import Image from 'next/image';
 import { projectsData } from './data/projectsData';
 import { teamData, TeamMember } from './data/teamData';
@@ -8,66 +8,75 @@ import ProjectCard from './components/ProjectCard';
 import TeamCard from './components/TeamCard';
 
 export default function Home() {
-// Navigation & UI Layout States
   const [filter, setFilter] = useState<'all' | 'creative' | 'tech'>('all');
   const [isDarkMode, setIsDarkMode] = useState<boolean>(true);
   const [activeModalMember, setActiveModalMember] = useState<TeamMember | null>(null);
+  const [processTab, setProcessTab] = useState<'creative' | 'tech' | 'hybrid'>('hybrid');
+  const [activeSection, setActiveSection] = useState<string>('hero');
 
-  // 🌟 ADD THIS INDEPENDENT STATE FOR THE PROCESS TRACKS
-  const [processTab, setProcessTab] = useState<'creative' | 'tech' | 'hybrid'>('hybrid');  const [formData, setFormData] = useState({ name: '', email: '', phone: '', message: '' });
+  // Navigation show/hide visibility states
+  const [isNavVisible, setIsNavVisible] = useState<boolean>(true);
+  const lastScrollY = useRef<number>(0);
+  const scrollTimeout = useRef<NodeJS.Timeout | null>(null);
+
+  const [formData, setFormData] = useState({ name: '', email: '', phone: '', message: '' });
   const [selectedWing, setSelectedWing] = useState<'design' | 'tech' | 'both'>('both');
   const [customFeatures, setCustomFeatures] = useState<string[]>([]);
   const [isSubmitted, setIsSubmitted] = useState<boolean>(false);
-// Dynamic Scroll Section Tracker for the Navigation Links
-  const [activeSection, setActiveSection] = useState<string>('hero');
 
   useEffect(() => {
     const handleScroll = () => {
+      const currentScrollY = window.scrollY;
+      
+      // 1. Core Section Tracking Highlight
       const sections = ['portfolio-section', 'process-section', 'team-section', 'planner-section'];
-      const scrollPosition = window.scrollY + 120; // Offset to match header block boundaries
-
-      // If we are at the top, reset highlight to none or hero
-      if (window.scrollY < 300) {
-        setActiveSection('hero');
-        return;
-      }
+      const scrollPosition = currentScrollY + 200;
 
       for (const section of sections) {
         const element = document.getElementById(section);
         if (element) {
           const top = element.offsetTop;
           const height = element.offsetHeight;
-
           if (scrollPosition >= top && scrollPosition < top + height) {
             setActiveSection(section);
             break;
           }
         }
       }
+
+      // 2. Intelligent Header HUD Visibility Mechanics
+      if (scrollTimeout.current) clearTimeout(scrollTimeout.current);
+
+      if (currentScrollY < 50) {
+        // Keep visible at the very top of the landing page
+        setIsNavVisible(true);
+      } else if (currentScrollY > lastScrollY.current) {
+        // Actively scrolling down -> Hide immediately
+        setIsNavVisible(false);
+      } else if (currentScrollY < lastScrollY.current) {
+        // Actively scrolling up -> Reveal immediately
+        setIsNavVisible(true);
+      }
+
+      // Reveal navigation header when user stops scrolling completely
+      scrollTimeout.current = setTimeout(() => {
+        setIsNavVisible(true);
+      }, 150);
+
+      lastScrollY.current = currentScrollY;
     };
 
-    window.addEventListener('scroll', handleScroll);
-    return () => window.removeEventListener('scroll', handleScroll);
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    return () => {
+      window.removeEventListener('scroll', handleScroll);
+      if (scrollTimeout.current) clearTimeout(scrollTimeout.current);
+    };
   }, []);
-  useEffect(() => {
-    const savedScrollPos = sessionStorage.getItem('homepageScrollPosition');
-    if (savedScrollPos) {
-      setTimeout(() => {
-        window.scrollTo({ top: parseInt(savedScrollPos, 10), behavior: 'instant' });
-        sessionStorage.removeItem('homepageScrollPosition');
-      }, 100);
-    }
-  }, []);
-
-  useEffect(() => {
-    document.body.style.overflow = activeModalMember ? 'hidden' : 'unset';
-    return () => { document.body.style.overflow = 'unset'; };
-  }, [activeModalMember]);
 
   const availableFeatures = {
-    design: ['Brand Identity & Logos', 'Marketing Materials', 'UI/UX Mobile Design', 'Web Design Layouts'],
-    tech: ['E-Commerce & Cashier Systems', 'Secure Database Systems', 'Custom Mobile Applications', 'Operations Dashboards'],
-    both: ['Complete Brand & App Ecosystem', 'School & Office Portals', 'Tourism & Booking Platforms', 'Custom Enterprise Tools']
+    design: ['Brand Identity & Logos', 'Graphic Design', 'UI/UX Mobile Design', 'Website Layouts'],
+    tech: ['E-Commerce Stores', 'Secure Databases', 'Custom Web Apps', 'Management Dashboards'],
+    both: ['Full Brand & Website Package', 'School & Office Portals', 'Booking & Tourism Platforms', 'Custom Business Tools']
   };
 
   const filteredProjects = projectsData.filter(project => {
@@ -77,11 +86,6 @@ export default function Home() {
 
   const toggleFeature = (feature: string) => {
     setCustomFeatures(prev => prev.includes(feature) ? prev.filter(f => f !== feature) : [...prev, feature]);
-  };
-
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-    const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -94,456 +98,310 @@ export default function Home() {
     }, 5000);
   };
 
-  const scrollToSection = (id: string) => {
-    document.getElementById(id)?.scrollIntoView({ behavior: 'smooth' });
-  };
-
   return (
-    <div className={`transition-colors duration-500 min-h-screen font-sans selection:bg-amber-200 selection:text-zinc-900 ${
-      isDarkMode ? 'bg-stone-950 text-stone-100' : 'bg-stone-50 text-stone-900'
+    <div className={`min-h-screen font-sans selection:bg-amber-500/30 transition-colors duration-1000 overflow-x-hidden ${
+      isDarkMode ? 'bg-[#0c0b0a] text-[#f4f3ef]' : 'bg-[#faf9f5] text-[#1a1918]'
     }`}>
       
-      {/* --- HEADER NAVIGATION BLOCK --- */}
-      {/* --- REFINED STICKY NAVIGATION BAR WITH ACTIVE SECTION HIGHLIGHTS --- */}
-      <header className={`sticky top-0 z-40 backdrop-blur-md transition-colors border-b px-6 sm:px-12 py-5 flex justify-between items-center ${
-        isDarkMode ? 'bg-stone-950/80 border-stone-900/40' : 'bg-stone-50/80 border-stone-200'
+      {/* Subtle background texture for character */}
+      <div className="fixed inset-0 opacity-[0.015] pointer-events-none bg-[radial-gradient(#1c1b18_1px,transparent_1px)] [background-size:16px_16px] z-50" />
+      
+      {/* --- INTELLIGENT SCROLL-REACTIVE TOP NAVIGATION BAR --- */}
+      <div className={`fixed top-6 left-0 right-0 z-50 px-4 flex justify-center transition-all duration-300 transform ${
+        isNavVisible ? 'translate-y-0 opacity-100' : '-translate-y-24 opacity-0 pointer-events-none'
       }`}>
-        <h1 
-          className="text-2xl font-serif font-bold tracking-tight cursor-pointer" 
-          onClick={() => { window.scrollTo({ top: 0, behavior: 'smooth' }); setActiveSection('hero'); }}
-        >
-          AOG<span className="text-amber-500">.</span>
-        </h1>
-        
-        {/* Navigation Core Track Items */}
-        <div className="flex items-center gap-6 sm:gap-8">
-          <button 
-            onClick={() => scrollToSection('portfolio-section')} 
-            className={`text-sm font-medium transition-colors cursor-pointer text-xs uppercase tracking-wider relative py-1 ${
-              activeSection === 'portfolio-section' 
-                ? 'text-amber-500 font-semibold' 
-                : isDarkMode ? 'text-stone-400 hover:text-stone-100' : 'text-stone-500 hover:text-stone-900'
-            }`}
-          >
-            Our Portfolio
-            {activeSection === 'portfolio-section' && (
-              <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-amber-500 rounded-full animate-fade-in" />
-            )}
-          </button>
+        <header className="w-full max-w-4xl backdrop-blur-xl border rounded-full px-6 py-3.5 flex justify-between items-center shadow-lg transition-all duration-500 bg-[#0c0b0a]/85 border-stone-800/80">
+          <div className="flex items-center gap-2 cursor-pointer" onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}>
+            <span className="text-amber-500 font-serif font-black text-xl tracking-tight">AOG<span className="text-white">.</span></span>
+          </div>
 
-          <button 
-            onClick={() => scrollToSection('process-section')} 
-            className={`text-sm font-medium transition-colors cursor-pointer text-xs uppercase tracking-wider relative py-1 ${
-              activeSection === 'process-section' 
-                ? 'text-amber-500 font-semibold' 
-                : isDarkMode ? 'text-stone-400 hover:text-stone-100' : 'text-stone-500 hover:text-stone-900'
-            }`}
-          >
-            Our Process
-            {activeSection === 'process-section' && (
-              <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-amber-500 rounded-full animate-fade-in" />
-            )}
-          </button>
+          <nav className="flex items-center gap-6 md:gap-8 font-sans text-xs font-medium tracking-wider uppercase">
+            {[
+              { id: 'portfolio-section', label: 'Our Work' },
+              { id: 'process-section', label: 'Our Process' },
+              { id: 'team-section', label: 'The Studio' },
+              { id: 'planner-section', label: 'Work With Us' }
+            ].map((item) => (
+              <button
+                key={item.id}
+                onClick={() => document.getElementById(item.id)?.scrollIntoView({ behavior: 'smooth' })}
+                className={`transition-colors relative py-1 cursor-pointer ${
+                  activeSection === item.id ? 'text-amber-500 font-semibold' : 'text-stone-400 hover:text-stone-100'
+                }`}
+              >
+                {item.label}
+              </button>
+            ))}
+          </nav>
 
-          <button 
-            onClick={() => scrollToSection('team-section')} 
-            className={`text-sm font-medium transition-colors cursor-pointer text-xs uppercase tracking-wider relative py-1 ${
-              activeSection === 'team-section' 
-                ? 'text-amber-500 font-semibold' 
-                : isDarkMode ? 'text-stone-400 hover:text-stone-100' : 'text-stone-500 hover:text-stone-900'
-            }`}
-          >
-            The Studio
-          </button>
-
-          <button 
-            onClick={() => scrollToSection('planner-section')}
-            className={`text-xs font-semibold tracking-wider transition-all cursor-pointer px-5 py-2 rounded-full border uppercase hidden sm:block ${
-              activeSection === 'planner-section'
-                ? 'bg-amber-500 text-stone-950 border-amber-500 shadow-md shadow-amber-500/10'
-                : 'bg-amber-500/10 text-amber-500 border-amber-500/30 hover:bg-amber-500 hover:text-stone-950'
-            }`}
-          >
-            Start a Project
-          </button>
-          
-          {/* Theme Switcher Toggle */}
           <button
             onClick={() => setIsDarkMode(!isDarkMode)}
-            className={`w-9 h-9 rounded-full border transition-all cursor-pointer flex items-center justify-center text-sm ${
-              isDarkMode ? 'border-stone-800 bg-stone-900 text-amber-400' : 'border-stone-200 bg-white text-stone-700 shadow-sm'
-            }`}
+            className="text-stone-400 hover:text-amber-400 transition-colors cursor-pointer text-sm"
           >
-            {isDarkMode ? '☀️' : '🌙'}
+            {isDarkMode ? '✦' : '⚜'}
           </button>
+        </header>
+      </div>
+
+      {/* --- HERO SECTION: MODERN MAGAZINE FRONT-PAGE SPLIT --- */}
+      <section className="relative min-h-screen grid grid-cols-1 lg:grid-cols-12 border-b border-stone-900/40 items-stretch pt-24">
+        <div className="lg:col-span-7 p-8 sm:p-16 flex flex-col justify-between relative">
+          <div className="text-xs font-sans tracking-widest uppercase text-amber-500 font-semibold">
+            Based in Malaybalay City, Bukidnon
+          </div>
+
+          <div className="space-y-6 my-auto py-12">
+            <h1 className="text-4xl sm:text-6xl font-serif font-light tracking-tight leading-[1.05] text-balance">
+              We create beautiful <span className="italic font-normal text-amber-500">brands</span> and build reliable, custom <span className="font-sans font-black uppercase tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-amber-400 to-orange-500">software.</span>
+            </h1>
+            <p className="max-w-xl text-base font-light tracking-wide leading-relaxed text-stone-400">
+              We are a hands-on creative studio. We combine world-class design with solid engineering to build websites, applications, and visual identities that help local businesses and institutions grow.
+            </p>
+          </div>
+
+          <div className="flex gap-6 border-t border-stone-800/40 pt-8 font-sans text-xs tracking-wider text-stone-500">
+            <div>EST. 2026</div>
+            <div>•</div>
+            <div>DIGITAL DESIGN STUDIO</div>
+          </div>
         </div>
-      </header>
 
-      {/* --- HERO SPLASH LAYER --- */}
-      <section className="relative min-h-[calc(100vh-77px)] flex flex-col justify-center items-center text-center px-6 overflow-hidden">
-        {/* Subtle, Warm Background Glow Blur effect to remove the cold brutalist feel */}
-        <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-amber-500/5 blur-[120px] rounded-full pointer-events-none" />
-        
-        <div className="max-w-4xl mx-auto space-y-8 relative z-10">
-          <span className={`text-xs font-mono tracking-[0.25em] uppercase inline-block px-4 py-1.5 rounded-full border ${
-            isDarkMode ? 'border-stone-800 bg-stone-900/40 text-amber-400' : 'border-amber-200 bg-amber-50/60 text-amber-800 font-medium'
-          }`}>
-            Rooted Creativity // Modern Engineering
-          </span>
-          
-          {/* Tagline preserved but rendered in an elegant, professional editorial serif layout */}
-          <h2 className="text-4xl sm:text-6xl font-serif font-normal tracking-tight leading-[1.1]">
-            Beautiful <span className="italic font-serif text-amber-500">designs</span> turned into powerful, working <span className="font-sans font-bold relative inline-block">software.</span>
-          </h2>
-          
-          <p className={`text-base sm:text-lg max-w-2xl mx-auto font-light leading-relaxed ${
-            isDarkMode ? 'text-stone-400' : 'text-stone-600'
-          }`}>
-            Based in Malaybalay City, Bukidnon, we collaborate with forward-thinking MSMEs, local government units, academic institutions, and community organizations. We bring your unique stories to life with meaningful design and build secure, dependable systems to help your operations thrive.
-          </p>
-
-          <div className="pt-4 flex flex-col sm:flex-row justify-center items-center gap-4">
-            <button onClick={() => scrollToSection('portfolio-section')} className={`w-full sm:w-auto font-bold px-8 py-4 rounded-full shadow-lg transition-all tracking-wider text-xs uppercase cursor-pointer ${isDarkMode ? 'bg-amber-500 text-stone-950 shadow-amber-500/5 hover:bg-amber-400 hover:scale-[1.02]' : 'bg-stone-900 text-white hover:bg-stone-800 shadow-stone-900/10 hover:scale-[1.02]'}`}>
-              Explore Portfolio
-            </button>
-            <button onClick={() => scrollToSection('planner-section')} className={`w-full sm:w-auto px-8 py-4 rounded-full font-medium border text-xs uppercase tracking-wider transition-all text-center cursor-pointer ${isDarkMode ? 'border-stone-800 hover:bg-stone-900 text-white' : 'border-stone-300 hover:bg-stone-100 text-stone-700'}`}>
-              Let's Build Together
-            </button>
+        <div className="lg:col-span-5 bg-[#121110] p-8 sm:p-12 flex flex-col justify-end relative overflow-hidden">
+          <div className="absolute inset-0 opacity-15 mix-blend-overlay bg-cover bg-center" style={{ backgroundImage: `url('https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?q=80&w=800')` }} />
+          <div className="space-y-4 z-10">
+            <div className="text-xl font-serif italic text-stone-200">"Tailored for your business, crafted by hand."</div>
+            <div className="h-[1px] w-12 bg-amber-500" />
+            <p className="text-sm font-light text-stone-400 leading-relaxed max-w-sm">
+              We don't use standard website templates. Everything we build is uniquely customized to fit your goals, engage your customers, and look exceptionally professional.
+            </p>
           </div>
         </div>
       </section>
 
-      {/* --- PORTFOLIO CASE STUDY DECK GRID --- */}
-      <section id="portfolio-section" className={`py-28 px-6 sm:px-12 border-t scroll-mt-[77px] transition-colors duration-500 ${
-        isDarkMode ? 'bg-stone-900/10 border-stone-900/40' : 'bg-stone-100/40 border-stone-200'
-      }`}>
-        <div className="max-w-7xl mx-auto">
-          <div className="mb-20 flex flex-col lg:flex-row justify-between items-start lg:items-end gap-8">
+      {/* --- WORKS SECTION: STAGGERED GRID SHOWCASE (FIXED ALIGNMENTS) --- */}
+      <section id="portfolio-section" className="py-32 px-6 sm:px-16 scroll-mt-20">
+        <div className="max-w-7xl mx-auto space-y-16">
+          
+          {/* FIXED SUBHEADER ROW ALIGNMENT */}
+          <div className="border-b border-stone-800/40 pb-6 flex flex-col md:flex-row justify-between items-baseline gap-4">
             <div className="space-y-2">
-              <h2 className="text-3xl sm:text-4xl font-serif tracking-tight">Stories of Impact & Progress</h2>
-              <p className={`font-light max-w-xl ${isDarkMode ? 'text-stone-400' : 'text-stone-600'}`}>
-                A curated look at visual brand transformations and custom platform solutions engineered for our local partners.
-              </p>
+              <span className="text-xs font-sans tracking-widest text-amber-500 font-semibold uppercase block">01 // Case Studies</span>
+              <h2 className="text-3xl font-serif tracking-tight">Recent Projects We've Launched</h2>
             </div>
-            
-            <div className={`flex p-1 rounded-full border ${isDarkMode ? 'bg-stone-950/60 border-stone-900' : 'bg-white border-stone-200 shadow-sm'}`}>
-              {(['all', 'creative', 'tech'] as const).map((type) => (
+
+            <div className="flex gap-4 font-sans text-xs font-medium tracking-wide uppercase self-start md:self-auto">
+              {(['all', 'creative', 'tech'] as const).map((t) => (
                 <button
-                  key={type}
-                  onClick={() => setFilter(type)}
-                  className={`px-5 py-2.5 rounded-full text-xs font-semibold tracking-wider uppercase transition-all cursor-pointer ${
-                    filter === type 
-                      ? isDarkMode ? 'bg-amber-500 text-stone-950 shadow-md' : 'bg-stone-900 text-white shadow-md'
-                      : isDarkMode ? 'text-stone-400 hover:text-stone-100' : 'text-stone-500 hover:text-stone-900'
+                  key={t}
+                  onClick={() => setFilter(t)}
+                  className={`pb-2 border-b-2 transition-all cursor-pointer ${
+                    filter === t ? 'border-amber-500 text-amber-500 font-semibold' : 'border-transparent text-stone-500 hover:text-stone-300'
                   }`}
                 >
-                  {type === 'all' ? 'All Work' : type === 'creative' ? 'Creative & Design' : 'Tech Solutions'}
+                  {t === 'all' ? 'All Work' : t === 'creative' ? 'Branding & Design' : 'Websites & Apps'}
                 </button>
               ))}
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-            {filteredProjects.map((project) => (
-              <ProjectCard key={project.id} project={project} isDarkMode={isDarkMode} />
-            ))}
+          {/* Off-center asymmetrical card layout grid flow */}
+          <div className="grid grid-cols-1 md:grid-cols-12 gap-12 items-start">
+            {filteredProjects.map((project, idx) => {
+              const isEven = idx % 2 === 0;
+              return (
+                <div 
+                  key={project.id} 
+                  className={`w-full transition-all duration-700 ${
+                    isEven ? 'md:col-span-7' : 'md:col-span-5 md:mt-24'
+                  }`}
+                >
+                  <div className="space-y-4">
+                    {/* Fixed aspect ratios inside custom containers prevent structural layout collapsing */}
+                    <div className="w-full relative rounded-2xl overflow-hidden aspect-[16/10] bg-stone-900/60 border border-stone-800/60">
+                      <ProjectCard project={project} isDarkMode={isDarkMode} />
+                    </div>
+                    <div className="flex justify-between items-center text-xs font-sans text-stone-500 px-1">
+                      <span className="font-medium">Project #0{project.id}</span>
+                      <span className="uppercase tracking-wider text-amber-500/90 text-[11px] font-semibold">{project.wing === 'tech' ? 'Web & Software' : 'Creative Design'}</span>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </div>
       </section>
-{/* --- HOW WE WORK (METHODOLOGY MATRICES) --- */}
-      <section id="process-section" className={`py-28 px-6 sm:px-12 border-t scroll-mt-[77px] transition-colors duration-500 ${
-        isDarkMode ? 'bg-stone-950 border-stone-900/40' : 'bg-white border-stone-200'
-      }`}>
-        <div className="max-w-6xl mx-auto">
-          
-          {/* Section Introduction */}
-          <div className="text-center mb-16 space-y-3">
-            <span className="text-[10px] font-mono tracking-[0.2em] uppercase block text-amber-500 font-bold">
-              03 // Guided Methodologies
-            </span>
-            <h2 className="text-3xl sm:text-4xl font-serif tracking-tight">How We Work</h2>
-            <p className={`font-light max-w-xl mx-auto text-sm ${isDarkMode ? 'text-stone-400' : 'text-stone-600'}`}>
-              Every project demands a unique approach. Choose a pathway below to explore our structured timeline tailored for your organization's specific goals.
+
+      {/* --- METHOD SECTION --- */}
+      <section id="process-section" className="py-32 px-6 sm:px-16 border-t border-b border-stone-900/40 bg-[#0e0d0c]">
+        <div className="max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-12 gap-16 items-start">
+          <div className="lg:col-span-4 space-y-5 lg:sticky lg:top-32">
+            <span className="text-xs font-sans tracking-widest text-amber-500 font-semibold block uppercase">02 // Our Framework</span>
+            <h2 className="text-3xl font-serif tracking-tight leading-tight">How Your Project Gets Built</h2>
+            <p className="text-sm font-light text-stone-400 leading-relaxed">
+              We keep our process transparent and collaborative. Choose a lane below to see exactly how we map out your path from initial idea to live launch.
             </p>
+            <div className="space-y-2 pt-2 font-sans">
+              {[
+                { id: 'creative', label: 'Branding & Identity Track' },
+                { id: 'tech', label: 'Websites & Custom Systems' },
+                { id: 'hybrid', label: 'The Full Studio Suite' }
+              ].map((b) => (
+                <button
+                  key={b.id}
+                  onClick={() => setProcessTab(b.id as any)}
+                  className={`w-full text-left text-xs p-3.5 border transition-all cursor-pointer flex justify-between items-center rounded-xl ${
+                    processTab === b.id ? 'border-amber-500 bg-stone-900/60 text-amber-400 font-semibold' : 'border-stone-900 text-stone-500 hover:text-stone-300'
+                  }`}
+                >
+                  <span>{b.label}</span>
+                  <span className="text-[10px]">{processTab === b.id ? '●' : '○'}</span>
+                </button>
+              ))}
+            </div>
           </div>
 
-          {/* Interactive Process Tab Selectors */}
-          <div className="flex flex-col md:flex-row justify-center items-center gap-3 mb-16">
+          <div className="lg:col-span-8 space-y-4">
             {[
-              { id: 'creative', label: '🎨 Creative & Brand Track', desc: 'For MSMEs, Tourism, and Identity Design' },
-              { id: 'tech', label: '💻 Digital & Software Track', desc: 'For Portals, Databases, and Custom Apps' },
-              { id: 'hybrid', label: '✨ Integrated Full Suite', desc: 'For Complete Scale-Ups & Ecosystems' }
-            ].map((tab) => (
-              <button
-                key={tab.id}
-                onClick={() => setProcessTab(tab.id as any)} // 🌟 UPDATED: Uses the isolated processTab state
-                className={`w-full md:w-auto text-left md:text-center px-6 py-4 rounded-2xl border transition-all cursor-pointer ${
-                  processTab === tab.id // 🌟 UPDATED
-                    ? isDarkMode 
-                      ? 'bg-amber-500 text-stone-950 border-amber-500 shadow-lg shadow-amber-500/5' 
-                      : 'bg-stone-900 text-white border-stone-900 shadow-md'
-                    : isDarkMode
-                      ? 'bg-stone-900/40 border-stone-900 text-stone-400 hover:text-stone-200'
-                      : 'bg-stone-50 border-stone-200 text-stone-600 hover:bg-stone-100'
-                }`}
-              >
-                <div className="text-xs font-bold uppercase tracking-wider">{tab.label}</div>
-                <div className={`text-[10px] font-light mt-0.5 ${processTab === tab.id ? isDarkMode ? 'text-stone-900/80' : 'text-stone-300' : 'text-stone-500'}`}>{tab.desc}</div>
-              </button>
-            ))}
-          </div>
-
-          {/* Dynamic Step Mapping Container */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 relative">
-            
-            {/* Step 1 */}
-            <div className={`p-8 rounded-3xl border space-y-4 transition-all duration-300 ${
-              isDarkMode ? 'bg-stone-900/20 border-stone-900' : 'bg-stone-50/50 border-stone-200 shadow-sm'
-            }`}>
-              <div className="flex justify-between items-center">
-                <span className="font-mono text-xs font-bold text-amber-500 bg-amber-500/10 px-3 py-1 rounded-full">Phase 01</span>
-                <span className="text-2xl opacity-80">
-                  {processTab === 'creative' ? '🤝' : processTab === 'tech' ? '📋' : '🔍'}
-                </span>
-              </div>
-              <h3 className="text-xl font-serif">
-                {processTab === 'creative' ? 'Discovery & Heritage' : processTab === 'tech' ? 'Requirement Scoping' : 'Strategic Audit'}
-              </h3>
-              <p className={`text-xs font-light leading-relaxed ${isDarkMode ? 'text-stone-400' : 'text-stone-600'}`}>
-                {processTab === 'creative' && "We sit down to understand your history, values, and vision. For tourism units and local brands, we look deep into cultural nuances to discover what makes your story truly distinct."}
-                {processTab === 'tech' && "We analyze your office or business workflows, pinpoint security requirements, data variables, and define exact system functionalities required to streamline your day-to-day operations."}
-                {processTab === 'hybrid' && "A comprehensive discovery sprint combining both creative market alignment and technical system diagnostics to lay down a solid operational foundation."}
-              </p>
-            </div>
-
-            {/* Step 2 */}
-            <div className={`p-8 rounded-3xl border space-y-4 transition-all duration-300 ${
-              isDarkMode ? 'bg-stone-900/20 border-stone-900' : 'bg-stone-50/50 border-stone-200 shadow-sm'
-            }`}>
-              <div className="flex justify-between items-center">
-                <span className="font-mono text-xs font-bold text-amber-500 bg-amber-500/10 px-3 py-1 rounded-full">Phase 02</span>
-                <span className="text-2xl opacity-80">
-                  {processTab === 'creative' ? '📐' : processTab === 'tech' ? '🖼️' : '🛠️'}
-                </span>
-              </div>
-              <h3 className="text-xl font-serif">
-                {processTab === 'creative' ? 'Concept & Refining' : processTab === 'tech' ? 'Architecture & UI' : 'Parallel Development'}
-              </h3>
-              <p className={`text-xs font-light leading-relaxed ${isDarkMode ? 'text-stone-400' : 'text-stone-600'}`}>
-                {processTab === 'creative' && "We draft high-fidelity vector assets, color systems, and typographic grids. We review drafts together, making adjustments until your brand mark fits perfectly."}
-                {processTab === 'tech' && "We map database connections, layout clean interface wireframes, and design interactive templates. You get to click through the screens before we write a single line of backend logic."}
-                {processTab === 'hybrid' && "Our design and engineering desks work in tandem—building identity architectures while structuring database protocols side-by-side."}
-              </p>
-            </div>
-
-            {/* Step 3 */}
-            <div className={`p-8 rounded-3xl border space-y-4 transition-all duration-300 ${
-              isDarkMode ? 'bg-stone-900/20 border-stone-900' : 'bg-stone-50/50 border-stone-200 shadow-sm'
-            }`}>
-              <div className="flex justify-between items-center">
-                <span className="font-mono text-xs font-bold text-amber-500 bg-amber-500/10 px-3 py-1 rounded-full">Phase 03</span>
-                <span className="text-2xl opacity-80">
-                  {processTab === 'creative' ? '📦' : processTab === 'tech' ? '🚀' : '🏁'}
-                </span>
-              </div>
-              <h3 className="text-xl font-serif">
-                {processTab === 'creative' ? 'Asset Deployment' : processTab === 'tech' ? 'Staging & Launch' : 'Ecosystem Hand-off'}
-              </h3>
-              <p className={`text-xs font-light leading-relaxed ${isDarkMode ? 'text-stone-400' : 'text-stone-600'}`}>
-                {processTab === 'creative' && "Receive production-ready vector assets, layout kits, and clear brand usage handbooks. Everything is organized so your team can deploy your branding immediately across any platform."}
-                {processTab === 'tech' && "We run optimization tests, verify end-to-end security loops, and securely launch your system. We stick around to onboard your staff and make sure everything operates smoothly."}
-                {processTab === 'hybrid' && "A complete rollout of fully responsive web platforms loaded with your premium brand identity assets, followed by hands-on operational training."}
-              </p>
-            </div>
-
-          </div>
-
-        </div>
-      </section>
-      {/* --- MEET OUR STUDIO TEAM SECTION --- */}
-      <section id="team-section" className={`py-28 px-6 sm:px-12 border-t scroll-mt-[77px] transition-colors duration-500 ${
-        isDarkMode ? 'bg-stone-950 border-stone-900/40' : 'bg-white border-stone-200'
-      }`}>
-        <div className="max-w-7xl mx-auto">
-          <div className="text-center lg:text-left mb-20 space-y-2">
-            <h2 className="text-3xl sm:text-4xl font-serif tracking-tight">Your Collaborative Partners</h2>
-            <p className={`font-light max-w-2xl ${isDarkMode ? 'text-stone-400' : 'text-stone-600'}`}>
-              We are a dedicated collective of regional creators and developers who believe in direct, reliable collaboration. Click any profile to explore our experience and project involvement.
-            </p>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-            {teamData.map((member) => (
-              <div key={member.id} onClick={() => setActiveModalMember(member)} className="cursor-pointer">
-                <TeamCard member={member} isDarkMode={isDarkMode} />
+              { id: '01', cTitle: 'Discovery & Creative Direction', tTitle: 'Planning & Project Scoping', hTitle: 'Complete Strategy Workshop', cDesc: 'We gather your team to explore your story and goals. We outline a clear visual direction that makes your business look professional and recognizable.', tDesc: 'We map out your business workflows, choose the best technical tools, and draft clear wireframes so you know exactly how the system will behave.', hDesc: 'A unified startup phase where we map out both your complete visual branding guidelines and technical feature dependencies at the same time.' },
+              { id: '02', cTitle: 'Design Concepts & Refinement', tTitle: 'Development & Interactive Mockups', hTitle: 'Parallel Design & Engineering', cDesc: 'We construct beautiful typography, color systems, and custom layouts. We collaborate with you to refine the details until it fits your brand perfectly.', tDesc: 'We build responsive web screens, structure secure database layers, and connect your systems. You will be able to click around and test everything live.', hDesc: 'Our team goes to work on both lanes at once—writing clean code scripts while crafting custom tailored visuals in real-time.' },
+              { id: '03', cTitle: 'Final Brand Asset Delivery', tTitle: 'Testing, Training & Going Live', hTitle: 'Full Ecosystem Launch', cDesc: 'You receive all your production-ready design files, digital media packages, and clear brand rules ready to use across your business.', tDesc: 'We thoroughly test your system, fix any issues, train your staff, and deploy your project live to the public safely.', hDesc: 'We launch your custom software system completely packed with your new signature branding, followed by long-term upkeep support.' }
+            ].map((step, index) => (
+              <div key={index} className="p-8 border border-stone-900/60 bg-[#0b0a09] grid grid-cols-1 md:grid-cols-12 gap-4 items-start rounded-2xl hover:border-stone-800 transition-colors">
+                <div className="md:col-span-1 font-sans text-xs text-amber-500 font-bold">{step.id}</div>
+                <div className="md:col-span-11 space-y-1">
+                  <h4 className="text-lg font-sans font-semibold text-stone-100">
+                    {processTab === 'creative' ? step.cTitle : processTab === 'tech' ? step.tTitle : step.hTitle}
+                  </h4>
+                  <p className="text-sm font-light text-stone-400 leading-relaxed tracking-wide">
+                    {processTab === 'creative' ? step.cDesc : processTab === 'tech' ? step.tDesc : step.hDesc}
+                  </p>
+                </div>
               </div>
             ))}
           </div>
         </div>
       </section>
 
-      {/* --- INTERACTIVE PROJECT PLANNER SECTION --- */}
-      <section id="planner-section" className={`py-28 px-6 sm:px-12 border-t scroll-mt-[77px] transition-colors duration-500 ${
-        isDarkMode ? 'bg-stone-900/10 border-stone-900/60' : 'bg-white border-stone-200'
-      }`}>
-        <div className="max-w-6xl mx-auto">
-          <div className="text-center mb-20 space-y-3">
-            <h2 className="text-3xl sm:text-4xl font-serif tracking-tight">Let's Map Out Your Project</h2>
-            <p className={`font-light max-w-xl mx-auto ${isDarkMode ? 'text-stone-400' : 'text-stone-600'}`}>
-              Whether you are expanding a business, launching a public portal, or telling a community story, let's craft the right plan for you.
-            </p>
+      {/* --- STUDIO STAFF SHOWCASE --- */}
+      <section id="team-section" className="py-32 px-6 sm:px-16 max-w-7xl mx-auto space-y-12 scroll-mt-20">
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-end border-b border-stone-800/40 pb-6 gap-4">
+          <div className="space-y-1">
+            <span className="text-xs font-sans tracking-widest text-stone-500 font-semibold block uppercase">03 // Who We Are</span>
+            <h2 className="text-3xl font-serif tracking-tight">The Makers Collective</h2>
           </div>
+          <p className="text-sm font-light text-stone-400 max-w-sm leading-relaxed">
+            We are real designers and full-stack engineers working locally in Bukidnon to bring your digital vision to life.
+          </p>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+          {teamData.map((member) => (
+            <div key={member.id} onClick={() => setActiveModalMember(member)} className="cursor-pointer">
+              <TeamCard member={member} isDarkMode={isDarkMode} />
+            </div>
+          ))}
+        </div>
+      </section>
 
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-start">
-            <div className={`lg:col-span-5 space-y-8 p-8 rounded-3xl border shadow-sm ${isDarkMode ? 'bg-stone-900/40 border-stone-900' : 'bg-stone-100/50 border-stone-200'}`}>
-              <div className="space-y-3">
-                <label className="text-xs font-mono uppercase tracking-widest font-bold text-amber-500">1 // Choose Your Scope Track</label>
-                <div className="grid grid-cols-3 gap-2">
-                  {(['design', 'tech', 'both'] as const).map((wing) => (
+      {/* --- FORM SECTION --- */}
+      <section id="planner-section" className="py-32 px-6 sm:px-16 border-t border-stone-900/40 bg-[#0e0d0c] scroll-mt-20">
+        <div className="max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-12 gap-16">
+          <div className="lg:col-span-5 space-y-6">
+            <span className="text-xs font-sans tracking-widest text-amber-500 font-semibold block uppercase">04 // Get In Touch</span>
+            <h2 className="text-3xl font-serif tracking-tight">Let's Discuss Your Project</h2>
+            <p className="text-sm font-light text-stone-400 leading-relaxed">
+              Tell us what you have in mind. Select your project needs below so we can share a tailored plan and estimate during our first meeting.
+            </p>
+            <div className="space-y-6 border-t border-stone-800/60 pt-6 font-sans">
+              <div className="space-y-2">
+                <span className="text-xs uppercase text-stone-400 font-semibold tracking-wider block">What track do you need?</span>
+                <div className="flex gap-2 text-xs">
+                  {(['design', 'tech', 'both'] as const).map((w) => (
                     <button
-                      key={wing}
-                      type="button"
-                      onClick={() => { setSelectedWing(wing); setCustomFeatures([]); }}
-                      className={`py-3 rounded-full text-xs font-semibold uppercase tracking-wider transition-all border cursor-pointer ${
-                        selectedWing === wing ? 'bg-amber-500 text-stone-950 border-amber-500 shadow-md' : isDarkMode ? 'bg-stone-950 border-stone-800 text-stone-400 hover:text-white' : 'bg-white border-stone-200 text-stone-600 hover:text-stone-900'
+                      key={w}
+                      onClick={() => { setSelectedWing(w); setCustomFeatures([]); }}
+                      className={`px-4 py-2.5 border transition-all cursor-pointer rounded-xl font-medium ${
+                        selectedWing === w ? 'border-amber-500 text-amber-400 bg-stone-900' : 'border-stone-900 text-stone-500 hover:text-stone-300'
                       }`}
                     >
-                      {wing === 'design' ? 'Design' : wing === 'tech' ? 'Digital' : 'Both'}
+                      {w === 'design' ? 'Branding' : w === 'tech' ? 'Web Development' : 'Both (Full Package)'}
                     </button>
                   ))}
                 </div>
               </div>
-
-              <div className="space-y-3">
-                <label className="text-xs font-mono uppercase tracking-widest font-bold text-amber-500">2 // Select Core Features</label>
-                <div className="flex flex-wrap gap-2 pt-1">
-                  {availableFeatures[selectedWing].map((feature) => {
-                    const isSelected = customFeatures.includes(feature);
+              <div className="space-y-2">
+                <span className="text-xs uppercase text-stone-400 font-semibold tracking-wider block">Select items you want to include:</span>
+                <div className="flex flex-wrap gap-2">
+                  {availableFeatures[selectedWing].map((f) => {
+                    const active = customFeatures.includes(f);
                     return (
                       <button
-                        key={feature}
-                        type="button"
-                        onClick={() => toggleFeature(feature)}
-                        className={`px-4 py-2 rounded-full text-xs font-medium transition-all border cursor-pointer ${
-                          isSelected ? isDarkMode ? 'bg-stone-800 border-amber-500 text-amber-400' : 'bg-amber-100 border-amber-400 text-amber-900' : isDarkMode ? 'bg-stone-950 border-stone-900 text-stone-500 hover:border-stone-800' : 'bg-white border-stone-200 text-stone-600 hover:bg-stone-100'
+                        key={f}
+                        onClick={() => toggleFeature(f)}
+                        className={`text-xs px-3 py-2 border rounded-full transition-all cursor-pointer ${
+                          active ? 'border-amber-500 text-amber-400 bg-amber-500/5 font-medium' : 'border-stone-900 text-stone-500 hover:border-stone-800'
                         }`}
                       >
-                        {isSelected ? '✓ ' : '+ '} {feature}
+                        {active ? '✓ ' : '+ '} {f}
                       </button>
                     );
                   })}
                 </div>
               </div>
-
-              <div className={`border-t pt-6 space-y-2 ${isDarkMode ? 'border-stone-800' : 'border-stone-200'}`}>
-                <span className="text-[10px] font-mono uppercase tracking-widest text-stone-500 block">Project Outline Summary</span>
-                <div className="font-mono text-xs p-4 rounded-2xl bg-stone-950/60 border border-stone-900/60 text-emerald-400 space-y-1">
-                  <div>Track // {selectedWing === 'design' ? 'Creative Direction' : selectedWing === 'tech' ? 'Digital Infrastructure' : 'Integrated System'}</div>
-                  <div>Items // {customFeatures.length} selected</div>
-                </div>
-              </div>
             </div>
-
-            <form onSubmit={handleSubmit} className="lg:col-span-7 space-y-6">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                <div className="space-y-2">
-                  <label htmlFor="name" className={`text-xs font-mono uppercase tracking-wider block ${isDarkMode ? 'text-stone-400' : 'text-stone-600'}`}>Your Name / Organization</label>
-                  <input type="text" id="name" name="name" required value={formData.name} onChange={handleInputChange} placeholder="Juan Dela Cruz" className={`w-full px-4 py-3.5 rounded-xl border text-sm transition-all focus:outline-none focus:ring-1 ${isDarkMode ? 'bg-stone-900 border-stone-800 focus:border-amber-500 focus:ring-amber-500 text-white' : 'bg-white border-stone-200 focus:border-stone-900 focus:ring-stone-900 text-stone-900'}`} />
-                </div>
-                <div className="space-y-2">
-                  <label htmlFor="email" className={`text-xs font-mono uppercase tracking-wider block ${isDarkMode ? 'text-stone-400' : 'text-stone-600'}`}>Email Address</label>
-                  <input type="email" id="email" name="email" required value={formData.email} onChange={handleInputChange} placeholder="hello@example.com" className={`w-full px-4 py-3.5 rounded-xl border text-sm transition-all focus:outline-none focus:ring-1 ${isDarkMode ? 'bg-stone-900 border-stone-800 focus:border-amber-500 focus:ring-amber-500 text-white' : 'bg-white border-stone-200 focus:border-stone-900 focus:ring-stone-900 text-stone-900'}`} />
-                </div>
-              </div>
-              <div className="space-y-2">
-                <label htmlFor="phone" className={`text-xs font-mono uppercase tracking-wider block ${isDarkMode ? 'text-stone-400' : 'text-stone-600'}`}>Contact Number</label>
-                <input type="tel" id="phone" name="phone" value={formData.phone} onChange={handleInputChange} placeholder="0917 123 4567" className={`w-full px-4 py-3.5 rounded-xl border text-sm transition-all focus:outline-none focus:ring-1 ${isDarkMode ? 'bg-stone-900 border-stone-800 focus:border-amber-500 focus:ring-amber-500 text-white' : 'bg-white border-zinc-200 focus:border-stone-900 focus:ring-stone-900 text-stone-900'}`} />
-              </div>
-              <div className="space-y-2">
-                <label htmlFor="message" className={`text-xs font-mono uppercase tracking-wider block ${isDarkMode ? 'text-stone-400' : 'text-stone-600'}`}>Tell us about your goals</label>
-                <textarea id="message" name="message" required rows={4} value={formData.message} onChange={handleInputChange} placeholder="What are your timelines, core ideas, or community challenges you want us to solve?" className={`w-full px-4 py-3.5 rounded-xl border text-sm transition-all focus:outline-none focus:ring-1 resize-none ${isDarkMode ? 'bg-stone-900 border-stone-800 focus:border-amber-500 focus:ring-amber-500 text-white' : 'bg-white border-stone-200 focus:border-stone-900 focus:ring-stone-900 text-stone-900'}`} />
-              </div>
-              <button type="submit" disabled={isSubmitted} className={`w-full font-bold px-8 py-4 rounded-full shadow-lg transition-all uppercase tracking-wider text-xs cursor-pointer ${isSubmitted ? 'bg-emerald-600 text-white cursor-not-allowed' : isDarkMode ? 'bg-amber-500 text-stone-950 hover:bg-amber-400' : 'bg-stone-900 text-white hover:bg-stone-800'}`}>
-                {isSubmitted ? '✔ Message Sent Successfully!' : 'Send Project Details →'}
-              </button>
-            </form>
           </div>
+
+          <form onSubmit={handleSubmit} className="lg:col-span-7 space-y-4 font-sans text-sm">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <input type="text" required placeholder="Your Name or Company Name" className="w-full bg-[#0b0a09] border border-stone-900 p-4 rounded-xl focus:outline-none focus:border-amber-500 text-stone-200" />
+              <input type="email" required placeholder="Your Email Address" className="w-full bg-[#0b0a09] border border-stone-900 p-4 rounded-xl focus:outline-none focus:border-amber-500 text-stone-200" />
+            </div>
+            <input type="tel" placeholder="Mobile Number (Optional)" className="w-full bg-[#0b0a09] border border-stone-900 p-4 rounded-xl focus:outline-none focus:border-amber-500 text-stone-200" />
+            <textarea required rows={5} placeholder="Tell us about your project, your timeline, or any specific requirements you have..." className="w-full bg-[#0b0a09] border border-stone-900 p-4 rounded-xl focus:outline-none focus:border-amber-500 text-stone-200 resize-none" />
+            <button type="submit" disabled={isSubmitted} className={`w-full p-4 font-medium transition-all rounded-xl uppercase text-center cursor-pointer text-xs tracking-wider ${
+              isSubmitted ? 'bg-emerald-700 text-white' : 'bg-amber-500 text-stone-950 hover:bg-amber-400 font-semibold'
+            }`}>
+              {isSubmitted ? '✓ Message Sent Successfully' : 'Send Project Details →'}
+            </button>
+          </form>
         </div>
       </section>
 
-      {/* --- FOOTER BLOCK --- */}
-      <footer className={`py-14 px-6 sm:px-12 border-t text-center text-xs font-mono tracking-widest ${isDarkMode ? 'bg-stone-950 border-stone-900 text-stone-600' : 'bg-stone-100 border-stone-200 text-stone-400'}`}>
-        <p>© AOG STUDIO. HARMONIZING DESIGN & TECHNOLOGY. MALAYBALAY CITY, BUKIDNON.</p>
+      {/* --- FOOTER --- */}
+      <footer className="py-16 border-t border-stone-900/40 text-center font-sans text-xs text-stone-600 space-y-2">
+        <div className="font-semibold text-stone-500">AOG STUDIO</div>
+        <div className="font-light">Malaybalay City, Bukidnon, Philippines • Serving businesses globally.</div>
       </footer>
 
-      {/* --- TEAM PROFILE OVERLAY MODAL --- */}
+      {/* --- TEAM MEMBER INFO MODAL --- */}
       {activeModalMember && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 bg-stone-950/80 backdrop-blur-md animate-fade-in">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#0b0a09]/95 backdrop-blur-md">
           <div className="absolute inset-0" onClick={() => setActiveModalMember(null)} />
-          
-          <div className={`relative w-full max-w-4xl max-h-[85vh] overflow-y-auto rounded-3xl border p-6 sm:p-10 shadow-2xl space-y-8 custom-scrollbar ${
-            isDarkMode ? 'bg-stone-900 border-stone-800/80 text-white shadow-black/80' : 'bg-white border-stone-200 text-stone-900 shadow-stone-300/40'
-          }`}>
-            
-            <button 
-              onClick={() => setActiveModalMember(null)} 
-              className={`absolute top-6 right-6 p-2 rounded-full border text-xs font-mono tracking-wider transition-all hover:scale-105 active:scale-95 cursor-pointer z-10 ${
-                isDarkMode ? 'bg-stone-950 border-stone-800 text-stone-400 hover:text-amber-500' : 'bg-stone-100 border-stone-200 text-stone-500 hover:text-black'
-              }`}
-            >
-              ✕ Close
-            </button>
-
-            <header className="flex flex-col sm:flex-row gap-6 items-start sm:items-center">
-              <div className={`w-24 h-24 rounded-2xl border overflow-hidden relative shrink-0 group ${
-                isDarkMode ? 'bg-stone-950 border-stone-800' : 'bg-stone-50 border-stone-200'
-              }`}>
-                <Image src={activeModalMember.realPhoto} alt={activeModalMember.name} fill sizes="96px" className="object-cover transition-opacity duration-500 opacity-0 group-hover:opacity-100" />
-                <Image src={activeModalMember.placeholderPhoto} alt={activeModalMember.name} fill sizes="96px" className="object-cover transition-opacity duration-500 group-hover:opacity-0" />
+          <div className="relative w-full max-w-2xl border border-stone-900 bg-[#121110] p-8 sm:p-10 space-y-6 rounded-2xl max-h-[85vh] overflow-y-auto">
+            <button onClick={() => setActiveModalMember(null)} className="absolute top-6 right-6 font-sans text-xs border border-stone-800 px-3 py-1.5 rounded-xl text-stone-400 hover:text-white cursor-pointer">✕ Close</button>
+            <div className="flex flex-col sm:flex-row gap-5 items-start sm:items-center">
+              <div className="w-16 h-16 rounded-full border border-stone-800 overflow-hidden relative shrink-0 bg-stone-950">
+                <Image src={activeModalMember.realPhoto} alt={activeModalMember.name} fill sizes="64px" className="object-cover" />
               </div>
-              
+              <div className="space-y-0.5">
+                <h3 className="text-2xl font-serif text-white">{activeModalMember.name}</h3>
+                <p className="text-sm font-sans text-stone-400">{activeModalMember.role}</p>
+              </div>
+            </div>
+            <div className="space-y-4 text-sm text-stone-400 border-t border-stone-900 pt-6 font-sans">
               <div className="space-y-1">
-                <span className="text-[10px] font-mono uppercase tracking-widest text-amber-500 font-bold block">Studio Core Profile</span>
-                <h3 className="text-3xl font-serif tracking-tight">{activeModalMember.name}</h3>
-                <p className={`text-sm ${isDarkMode ? 'text-stone-400' : 'text-stone-600'}`}>{activeModalMember.role}</p>
+                <div className="text-xs text-stone-500 font-semibold uppercase tracking-wider">About</div>
+                <p className="font-light leading-relaxed text-stone-300">{activeModalMember.bio}</p>
               </div>
-            </header>
-
-            <hr className={isDarkMode ? 'border-stone-800' : 'border-stone-200'} />
-
-            <section className="space-y-2">
-              <h4 className="text-xs font-mono uppercase tracking-wider text-stone-400 font-bold">01 // About & Focus</h4>
-              <p className={`text-base font-light leading-relaxed max-w-3xl ${isDarkMode ? 'text-stone-300' : 'text-stone-600'}`}>
-                {activeModalMember.bio}
-              </p>
-            </section>
-
-            <section className="space-y-2">
-              <h4 className="text-xs font-mono uppercase tracking-wider text-stone-400 font-bold">02 // Areas of Practice</h4>
-              <div className="flex flex-wrap gap-2">
-                {activeModalMember.specialty.map((skill, idx) => (
-                  <span key={idx} className={`text-xs font-mono px-3 py-1 rounded-full border ${
-                    isDarkMode ? 'bg-stone-950 border-stone-800 text-amber-400/80' : 'bg-stone-50 border-stone-200 text-stone-700'
-                  }`}>
-                    {skill}
-                  </span>
-                ))}
-              </div>
-            </section>
-
-            <section className="space-y-4 pt-2">
-              <h4 className="text-xs font-mono uppercase tracking-wider text-stone-400 font-bold">03 // Associated Portfolio Project Links</h4>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {projectsData
-                  .filter(p => activeModalMember.projectIds.includes(p.id))
-                  .map(project => (
-                    <div key={project.id} onClick={() => setActiveModalMember(null)}>
-                      <ProjectCard project={project} isDarkMode={isDarkMode} />
-                    </div>
+              <div className="space-y-2 pt-2">
+                <div className="text-xs text-stone-500 font-semibold uppercase tracking-wider">Core Focus Areas</div>
+                <div className="flex flex-wrap gap-1.5">
+                  {activeModalMember.specialty.map((skill, idx) => (
+                    <span key={idx} className="text-xs border border-stone-800 bg-[#0b0a09] px-3 py-1 rounded-full text-amber-400/90">{skill}</span>
                   ))}
+                </div>
               </div>
-            </section>
-
+            </div>
           </div>
         </div>
       )}
